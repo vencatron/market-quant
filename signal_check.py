@@ -476,3 +476,85 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def close_eod_positions():
+    """Close all open paper positions at EOD (called at 3:45 PM ET)."""
+    trades_file = os.path.join(DATA_DIR, "active_scalps.json")
+    if not os.path.exists(trades_file):
+        return []
+
+    with open(trades_file) as f:
+        try:
+            active = json.load(f)
+        except:
+            return []
+
+    if not active:
+        return []
+
+    closed = []
+    headers = alpaca_headers()
+
+    # Get all open positions from Alpaca
+    try:
+        resp = requests.get(f"{ALPACA_URL}/v2/positions", headers=headers, timeout=10)
+        positions = resp.json() if resp.status_code == 200 else []
+    except:
+        positions = []
+
+    # Close each position
+    for pos in positions:
+        ticker = pos.get("symbol")
+        try:
+            resp = requests.delete(f"{ALPACA_URL}/v2/positions/{ticker}", headers=headers, timeout=10)
+            if resp.status_code in (200, 204):
+                pnl = float(pos.get("unrealized_pl", 0))
+                closed.append({"ticker": ticker, "pnl": pnl})
+        except Exception as e:
+            print(f"Failed to close {ticker}: {e}")
+
+    # Log closed trades
+    if closed:
+        total_pnl = sum(t["pnl"] for t in closed)
+        msg = (
+            f"📊 *TrumpQuant EOD Close*\n\n"
+            f"Closed {len(closed)} positions\n"
+        )
+        for t in closed:
+            emoji = "✅" if t["pnl"] >= 0 else "❌"
+            msg += f"{emoji} {t['ticker']}: ${t['pnl']:+.2f}\n"
+        msg += f"\n*Net P&L: ${total_pnl:+.2f}*"
+        send_telegram(msg)
+
+        # Append to bot_trades.json
+        bot_trades_file = os.path.join(DATA_DIR, "bot_trades.json")
+        existing = []
+        if os.path.exists(bot_trades_file):
+            with open(bot_trades_file) as f:
+                try: existing = json.load(f)
+                except: existing = []
+        from datetime import datetime, timezone
+        for t in closed:
+            existing.append({
+                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "ticker": t["ticker"],
+                "exit": "EOD",
+                "pnl": t["pnl"],
+            })
+        with open(bot_trades_file, "w") as f:
+            json.dump(existing, f, indent=2)
+
+    # Clear active scalps
+    with open(trades_file, "w") as f:
+        json.dump([], f)
+
+    return closed
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "eod":
+        close_eod_positions()
+    else:
+        main()
