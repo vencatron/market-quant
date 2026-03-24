@@ -2,828 +2,329 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TrumpQuant v2 — Strike Zone</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>TrumpQuant</title>
 <style>
-/* === VARIABLES === */
-:root {
-  --bg: #0a0a0f;
-  --bg2: #10101a;
-  --bg-card: #14142a;
-  --bg-card-hover: #1c1c3a;
-  --border: #1e1e36;
-  --text: #e0e0e0;
-  --text2: #8888aa;
-  --text-muted: #555577;
-  --hot: #ff2a2a;
-  --hot2: #ff6600;
-  --cold: #1a3a5c;
-  --cold2: #0d2137;
-  --nuclear: #ff0000;
-  --profit: #00ff88;
-  --loss: #ff3333;
-  --green: #00ff88;
-  --red: #ff3355;
-  --orange: #ff8800;
-  --yellow: #ffcc00;
-  --purple: #aa55ff;
-  --blue: #4488ff;
-  --cyan: #00ccff;
-  --mono: 'Courier New', 'Consolas', monospace;
-  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:var(--bg); color:var(--text); font-family:var(--sans); overflow-x:hidden; }
-::-webkit-scrollbar { width:5px; }
-::-webkit-scrollbar-track { background:var(--bg); }
-::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
-
-/* === TOP STRIP — STRIKE METER === */
-.strike-strip {
-  background: linear-gradient(135deg, var(--bg2) 0%, #0d0d1a 100%);
-  border-bottom: 2px solid var(--border);
-  padding: 18px 24px 14px;
-}
-.strike-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
-}
-.strike-title {
-  font-family: var(--mono); font-size: 12px; letter-spacing: 3px;
-  color: var(--text-muted); text-transform: uppercase;
-}
-.strike-badges {
-  display: flex; gap: 12px; align-items: center;
-}
-.paper-badge {
-  background: var(--yellow); color: #000; padding: 3px 12px; border-radius: 3px;
-  font-weight: 800; font-size: 10px; letter-spacing: 1px;
-}
-.strike-status {
-  text-align: center; margin-bottom: 10px;
-}
-.strike-status-text {
-  font-family: var(--mono); font-size: 36px; font-weight: 900;
-  letter-spacing: 4px; transition: all 0.5s ease;
-}
-.strike-status-text.cold { color: #4488cc; text-shadow: 0 0 20px rgba(68,136,204,0.3); }
-.strike-status-text.warm { color: var(--orange); text-shadow: 0 0 20px rgba(255,136,0,0.4); }
-.strike-status-text.hot { color: var(--hot); text-shadow: 0 0 30px rgba(255,42,42,0.6), 0 0 60px rgba(255,42,42,0.3); }
-.strike-status-text.nuclear {
-  color: var(--nuclear);
-  text-shadow: 0 0 30px rgba(255,0,0,0.8), 0 0 60px rgba(255,0,0,0.5), 0 0 100px rgba(255,0,0,0.3);
-  animation: nuclear-pulse 0.8s ease-in-out infinite;
-}
-@keyframes nuclear-pulse {
-  0%,100% { opacity:1; transform:scale(1); }
-  50% { opacity:0.85; transform:scale(1.02); }
-}
-
-/* Strike gauge bar */
-.gauge-track {
-  width: 100%; height: 12px; border-radius: 6px;
-  background: linear-gradient(90deg, var(--cold) 0%, var(--cold2) 20%, #333 40%, var(--hot2) 70%, var(--hot) 85%, var(--nuclear) 100%);
-  position: relative; margin: 8px 0;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
-}
-.gauge-needle {
-  position: absolute; top: -4px; width: 4px; height: 20px;
-  background: #fff; border-radius: 2px; transition: left 0.8s ease;
-  box-shadow: 0 0 10px rgba(255,255,255,0.8);
-}
-.gauge-labels {
-  display: flex; justify-content: space-between;
-  font-family: var(--mono); font-size: 9px; color: var(--text-muted);
-  margin-top: 2px;
-}
-.strike-meta {
-  text-align: center; font-family: var(--mono); font-size: 11px; color: var(--text2);
-  margin-top: 6px;
-}
-.strike-meta span { color: var(--text); font-weight: 600; }
-
-/* === MAIN GRID — ROW 1 === */
-.row1 {
-  display: grid; grid-template-columns: 260px 1fr 300px;
-  gap: 0; height: calc(50vh - 80px); min-height: 320px;
-  border-bottom: 1px solid var(--border);
-}
-
-/* === MAIN GRID — ROW 2 === */
-.row2 {
-  display: grid; grid-template-columns: 60% 40%;
-  gap: 0; height: calc(50vh - 100px); min-height: 280px;
-}
-
-.panel {
-  border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 14px;
-}
-.panel:last-child { border-right: none; }
-
-.panel-title {
-  font-family: var(--mono); font-size: 10px; font-weight: 700;
-  letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase;
-  margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
-}
-
-/* === POST CARDS === */
-.post-card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
-  padding: 8px 10px; margin-bottom: 6px; transition: all 0.2s;
-  animation: slide-in 0.3s ease-out;
-}
-.post-card:hover { background: var(--bg-card-hover); }
-.post-card.iran-post {
-  border-color: var(--nuclear); background: rgba(255,0,0,0.08);
-}
-@keyframes slide-in {
-  from { opacity:0; transform:translateY(-10px); }
-  to { opacity:1; transform:translateY(0); }
-}
-.post-time { font-family:var(--mono); font-size:9px; color:var(--text-muted); margin-bottom:3px; }
-.post-text { font-size:12px; line-height:1.3; color:var(--text); margin-bottom:5px;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.post-badges { display:flex; gap:4px; flex-wrap:wrap; }
-.badge {
-  display:inline-block; padding:1px 6px; border-radius:3px; font-size:9px;
-  font-weight:700; font-family:var(--mono); letter-spacing:0.5px;
-}
-.badge-TARIFFS { background:rgba(255,136,0,0.2); color:var(--orange); }
-.badge-TRADE_DEAL { background:rgba(0,255,136,0.15); color:var(--green); }
-.badge-CRYPTO { background:rgba(170,85,255,0.2); color:var(--purple); }
-.badge-FED_ATTACK { background:rgba(255,51,85,0.2); color:var(--red); }
-.badge-MARKET_PUMP { background:rgba(255,204,0,0.2); color:var(--yellow); }
-.badge-IRAN_ESCALATION { background:rgba(255,0,0,0.3); color:#ff4444; }
-.badge-IRAN_DEESCALATION { background:rgba(0,255,136,0.2); color:var(--green); }
-.badge-OIL_SHOCK { background:rgba(255,136,0,0.25); color:var(--orange); }
-.badge-WAR_GENERAL { background:rgba(255,51,85,0.2); color:var(--red); }
-.badge-SPECIFIC_TICKER { background:rgba(68,136,255,0.2); color:var(--blue); }
-.badge-STOCKS_BULLISH { background:rgba(0,204,255,0.15); color:var(--cyan); }
-.iran-badge { background:var(--nuclear); color:#fff; animation:nuclear-pulse 1s infinite; }
-
-/* === HEATMAP GRID (hero) === */
-.heatmap-container { position:relative; width:100%; height:100%; padding:8px; }
-.heatmap-grid {
-  display:grid; gap:2px; width:100%; height:calc(100% - 30px);
-}
-.heatmap-cell {
-  display:flex; align-items:center; justify-content:center; position:relative;
-}
-.heatmap-dot {
-  border-radius:50%; transition:all 0.4s ease; cursor:pointer; position:relative;
-}
-.heatmap-dot.bullish {
-  background: radial-gradient(circle, var(--green) 0%, rgba(0,255,136,0.3) 70%);
-  box-shadow: 0 0 8px rgba(0,255,136,0.5);
-}
-.heatmap-dot.bearish {
-  background: radial-gradient(circle, var(--red) 0%, rgba(255,51,85,0.3) 70%);
-  box-shadow: 0 0 8px rgba(255,51,85,0.5);
-}
-.heatmap-dot.neutral {
-  background: radial-gradient(circle, #555 0%, rgba(85,85,85,0.3) 70%);
-  box-shadow: none;
-}
-.heatmap-dot.active {
-  animation: dot-pulse 1.2s ease-in-out infinite;
-}
-@keyframes dot-pulse {
-  0%,100% { transform:scale(1); opacity:1; }
-  50% { transform:scale(1.3); opacity:0.8; }
-}
-.heatmap-ylabel {
-  font-family:var(--mono); font-size:10px; color:var(--text2);
-  display:flex; align-items:center; padding-right:6px; justify-content:flex-end;
-}
-.heatmap-xlabel {
-  font-family:var(--mono); font-size:8px; color:var(--text-muted);
-  text-align:center; transform:rotate(-45deg); white-space:nowrap;
-}
-.heatmap-tooltip {
-  position:fixed; background:rgba(10,10,20,0.95); border:1px solid var(--border);
-  border-radius:6px; padding:8px 12px; font-family:var(--mono); font-size:11px;
-  color:var(--text); pointer-events:none; z-index:999; display:none;
-  box-shadow:0 4px 20px rgba(0,0,0,0.5);
-}
-
-/* === ACTIVE TRADES PANEL === */
-.trade-card {
-  background:var(--bg-card); border:1px solid var(--border); border-radius:6px;
-  padding:8px 10px; margin-bottom:6px;
-}
-.trade-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
-.trade-ticker { font-family:var(--mono); font-size:14px; font-weight:800; }
-.trade-ticker.long { color:var(--green); }
-.trade-ticker.short { color:var(--red); }
-.trade-direction {
-  font-family:var(--mono); font-size:9px; padding:2px 6px; border-radius:3px;
-  font-weight:700; letter-spacing:1px;
-}
-.trade-direction.long { background:rgba(0,255,136,0.15); color:var(--green); }
-.trade-direction.short { background:rgba(255,51,85,0.15); color:var(--red); }
-.trade-pnl { font-family:var(--mono); font-size:13px; font-weight:700; }
-.trade-pnl.positive { color:var(--profit); }
-.trade-pnl.negative { color:var(--loss); }
-.trade-meta { font-family:var(--mono); font-size:9px; color:var(--text-muted); }
-.trade-price-bar {
-  height:4px; border-radius:2px; background:var(--border); margin-top:4px; position:relative;
-}
-.trade-price-fill {
-  height:100%; border-radius:2px; position:absolute; left:0; top:0;
-}
-
-/* === BOT ACTIVITY CHART === */
-.chart-container {
-  position:relative; width:100%; height:calc(100% - 30px);
-}
-
-/* === SIGNAL PLAYBOOK === */
-.playbook-card {
-  background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
-  padding:12px 14px; margin-bottom:8px;
-}
-.playbook-setup {
-  font-family:var(--mono); font-size:11px; letter-spacing:1px;
-  color:var(--yellow); margin-bottom:8px;
-}
-.playbook-step {
-  display:flex; align-items:center; gap:8px; margin-bottom:6px;
-  font-family:var(--mono); font-size:12px;
-}
-.playbook-step-num {
-  width:20px; height:20px; border-radius:50%; display:flex;
-  align-items:center; justify-content:center; font-size:10px; font-weight:800;
-  background:rgba(68,136,255,0.2); color:var(--blue);
-}
-.playbook-winrate {
-  font-family:var(--mono); font-size:10px; color:var(--text2); margin-top:8px;
-}
-.execute-btn {
-  width:100%; padding:10px; border:none; border-radius:6px; cursor:pointer;
-  font-family:var(--mono); font-size:14px; font-weight:800; letter-spacing:2px;
-  background:linear-gradient(135deg, #00aa55, #00ff88); color:#000;
-  margin-top:8px; transition:all 0.2s;
-}
-.execute-btn:hover { transform:translateY(-1px); box-shadow:0 4px 20px rgba(0,255,136,0.4); }
-.execute-btn:active { transform:translateY(0); }
-.execute-btn.short-btn { background:linear-gradient(135deg, #aa2244, #ff3355); color:#fff; }
-
-/* === BOTTOM BAR === */
-.bottom-bar {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:8px 24px; background:var(--bg2); border-top:1px solid var(--border);
-  font-family:var(--mono); font-size:12px;
-}
-.bottom-stats { display:flex; gap:28px; }
-.bottom-stat-label { color:var(--text-muted); font-size:9px; letter-spacing:1px; }
-.bottom-stat-val { font-weight:700; font-size:14px; }
-.bottom-stat-val.positive { color:var(--profit); }
-.bottom-stat-val.negative { color:var(--loss); }
-.kill-switch {
-  display:flex; align-items:center; gap:8px; cursor:pointer;
-}
-.kill-switch-toggle {
-  width:36px; height:18px; border-radius:9px; background:var(--border);
-  position:relative; transition:background 0.3s; cursor:pointer;
-}
-.kill-switch-toggle.active { background:var(--red); }
-.kill-switch-dot {
-  width:14px; height:14px; border-radius:50%; background:#fff;
-  position:absolute; top:2px; left:2px; transition:left 0.3s;
-}
-.kill-switch-toggle.active .kill-switch-dot { left:20px; }
-.kill-label { font-size:9px; color:var(--text-muted); letter-spacing:1px; }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+#app{flex:1;overflow-y:auto;overflow-x:clip;-webkit-overflow-scrolling:touch;padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#222230;border-radius:2px}
+@keyframes pnuc{0%,100%{box-shadow:0 0 20px #3d0000,0 0 40px #7a0000}50%{box-shadow:0 0 40px #7a0000,0 0 80px #f00}}
+@keyframes phot{0%,100%{box-shadow:0 0 12px #5c2000}50%{box-shadow:0 0 28px #ff3d3d}}
+@keyframes pwrm{0%,100%{box-shadow:0 0 8px #5c4a00}50%{box-shadow:0 0 18px #ff9100}}
+@keyframes ldp{0%,100%{opacity:.5}50%{opacity:.2}}
+.cd{background:#111118;border:1px solid #222230;border-radius:12px;margin:8px;contain:layout style;overflow:hidden}
+.ch{padding:9px 12px;font-size:11px;color:#666680;text-transform:uppercase;border-bottom:1px solid #1a1a28;display:flex;align-items:center;justify-content:space-between}
+#strike{margin:8px;border-radius:12px;border:1px solid #222230;overflow:hidden;cursor:pointer;contain:layout style}
+#sbg{padding:14px}
+#sz{font-size:11px;font-weight:700;letter-spacing:.15em;color:#666680}
+#sl{font-size:24px;font-weight:700;line-height:1;margin-top:4px}
+#ss{font-size:12px;color:#666680;margin-top:5px}
+#sbw{background:#0a0a0f;height:6px;border-radius:3px;margin-top:9px;overflow:hidden}
+#sb{height:100%;border-radius:3px;transition:width .8s,background .5s;will-change:transform}
+#sdd{padding:0 12px;max-height:0;overflow:hidden;transition:max-height .3s}
+#sdd.o{max-height:120px}
+#sddi{padding:6px 0 8px;font-size:12px;color:#888899;border-top:1px solid #1a1a28;display:grid;grid-template-columns:1fr 1fr;gap:4px}
+#sddi span{display:flex;flex-direction:column;gap:1px}
+#sddi b{color:#e0e0e0;font-size:14px}
+.zc{background:linear-gradient(135deg,#0d1f30,#111118);border-color:#1a3a5c!important}
+.zc #sz{color:#4a8ab5}.zc #sb{background:#1a6ab5}
+.zw{background:linear-gradient(135deg,#1a1400,#111118);border-color:#5c4a00!important;animation:pwrm 3s infinite}
+.zw #sz{color:#b58a00}.zw #sb{background:#ff9100}
+.zh{background:linear-gradient(135deg,#1a0800,#111118);border-color:#5c2000!important;animation:phot 2s infinite}
+.zh #sz{color:#b54a00}.zh #sb{background:#ff4d00}
+.zn{background:linear-gradient(135deg,#1a0000,#0d0000);border-color:#7a0000!important;animation:pnuc 1.5s infinite}
+.zn #sz{color:#f22}.zn #sl{color:#f44;text-shadow:0 0 20px #f0000088}.zn #sb{background:linear-gradient(90deg,#7a0000,#f00,#f66)}
+.tsec{display:none}.tsec.a{display:block}
+#nav{position:fixed;bottom:0;left:0;right:0;height:calc(56px + env(safe-area-inset-bottom));background:#111118;border-top:1px solid #222230;display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:none;background:none;color:#666680;font-size:9px;font-weight:600;cursor:pointer;padding:6px 4px}
+.nb.a{color:#e0e0e0}
+.nd{width:4px;height:4px;background:#00e676;border-radius:50%;opacity:0}
+.nb.a .nd{opacity:1}
+.nb-ic{font-size:18px}
+.tsc{display:flex;gap:10px;overflow-x:auto;padding:0 8px 8px;scroll-snap-type:x mandatory}
+.tsc::-webkit-scrollbar{display:none}
+.tc{min-width:255px;scroll-snap-align:start;background:#0d0d15;border:1px solid #222230;border-radius:10px;padding:12px;flex-shrink:0}
+.th{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.ttk{font-size:18px;font-weight:700}
+.dp{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+.dp.lg{background:#003d1f;color:#00e676;border:1px solid #00e676}
+.dp.sh{background:#3d0000;color:#ff3d3d;border:1px solid #ff3d3d}
+.pnl{font-size:20px;font-weight:700;margin-bottom:4px}
+.pp{color:#00e676}.pn{color:#ff3d3d}
+.er{font-size:11px;color:#666680;margin-bottom:8px}
+.bc{width:100%;padding:8px;background:#1a0000;border:1px solid #5c0000;border-radius:8px;color:#ff3d3d;font-size:12px;font-weight:700;cursor:pointer}
+.bc:active{background:#2d0000}
+.es{padding:18px 14px;text-align:center;color:#444458;font-size:13px}
+#pbw{padding:8px}
+.pbh{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pbt{font-weight:700}
+.cb{font-size:10px;padding:3px 8px;border-radius:20px;background:#1a1a28;color:#888899;border:1px solid #222230}
+.pba{background:#0d1a0d;border:1px solid #0d3d1a;border-radius:10px;padding:11px}
+.pbal{font-size:11px;color:#666680;margin-bottom:3px}
+.pbat{font-size:16px;font-weight:700;color:#00e676}
+.pm{font-size:11px;color:#666680;margin-bottom:6px}
+.pm b,.bx{width:100%;padding:13px;background:linear-gradient(135deg,#003d1f,#006b33);border:1px solid #00e676;border-radius:10px;color:#00e676;font-size:15px;font-weight:700;cursor:pointer}
+.bx:disabled{opacity:.4;cursor:not-allowed}
+.bx:not(:disabled):active{opacity:.7}
+#hw{overflow-x:auto}
+#hg{display:grid;gap:4px}
+.hd{aspect-ratio:1;border-radius:50%;transition:transform .2s}
+.hd:active{transform:scale(1.3)}
+.htk{font-size:9px;color:#444458}
+#ht{position:fixed;background:#1a1a28;border:1px solid #333344;border-radius:8px;padding:8px 10px;font-size:12px;z-index:200;display:none;max-width:180px;pointer-events:none}
+#ht b{color:#00e676;display:block;font-size:14px}
+.pc{background:#0d0d15;border:1px solid #222230;border-radius:10px;margin:0 8px 8px;overflow:hidden}
+.pc.ir{border-left:3px solid #ff3d3d;box-shadow:-4px 0 12px #ff3d3d22}
+.ph{display:flex;align-items:center;gap:8px;padding:8px 12px 4px}
+.pt{font-size:10px;color:#444458}
+.cat{font-size:9px;padding:2px 7px;border-radius:20px;background:#1a1a28;color:#666680;border:1px solid #222230}
+.cat.ci{background:#1a0000;color:#ff3d3d;border-color:#5c0000}
+.cat.ct{background:#1a1400;color:#ff9100;border-color:#5c4a00}
+.cat.cd{background:#001a08;color:#00e676;border-color:#005c1f}
+.pb{padding:0 12px 8px;font-size:13px;color:#aaa}
+.pb.tr{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#sg{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px}
+.sc{background:#0d0d15;border:1px solid #222230;border-radius:10px;padding:12px;text-align:center}
+.sl{font-size:10px;color:#444458;text-transform:uppercase;margin-bottom:3px}
+.sv{font-size:22px;font-weight:700}
+#kw{padding:8px}
+.kh{text-align:center;padding:16px;font-size:13px;color:#666680}
+#ks{text-align:center;font-size:12px;color:#444458}
+#ks.on{color:#ff3d3d!important}
+#kt{width:calc(100% - 16px);margin:0 auto;padding:17px;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;border:2px solid;transition:all .2s}
+#kt.off{background:#001a08;border-color:#00e676;color:#00e676}
+#kt.on{background:#1a0000;border-color:#ff3d3d;color:#ff3d3d;animation:phot 1.5s infinite}
+#ptr{height:0;overflow:hidden;text-align:center;line-height:38px;transition:height .2s;font-size:12px;color:#444458}
+#ptr.s{height:38px}
+#tst{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-70px);background:#1a1a28;border:1px solid #333344;border-radius:8px;padding:8px 14px;font-size:13px;z-index:300;transition:transform .3s;text-align:center}
+#tst.s{transform:translateX(-50%) translateY(0)}
+.ld{opacity:.5;animation:ldp 1s infinite}
 </style>
 </head>
 <body>
-
-<!-- TOP STRIP — STRIKE METER -->
-<div class="strike-strip">
-  <div class="strike-header">
-    <div class="strike-title">TrumpQuant v2 — Strike Zone</div>
-    <div class="strike-badges">
-      <span class="paper-badge">PAPER MODE</span>
-    </div>
-  </div>
-  <div class="strike-status">
-    <div id="strikeText" class="strike-status-text cold">&#x1F976; COLD — Bots Inactive</div>
-  </div>
-  <div class="gauge-track">
-    <div id="gaugeNeedle" class="gauge-needle" style="left:10%"></div>
-  </div>
-  <div class="gauge-labels">
-    <span>COLD</span><span>WARM</span><span>HOT</span><span>NUCLEAR</span>
-  </div>
-  <div class="strike-meta">
-    Last post: <span id="lastPostAgo">--</span> ago &nbsp;|&nbsp;
-    Open trades: <span id="openTradeCount">0</span> &nbsp;|&nbsp;
-    Heat: <span id="heatPercent">--</span>
-  </div>
+<div id=ptr>↓ Pull to refresh</div>
+<div id=app>
+<div id=strike onclick="tSD()">
+<div id=sbg>
+<div id=sz>—</div>
+<div id=sl>Loading...</div>
+<div id=ss>Fetching...</div>
+<div id=sbw><div id=sb style="width:10%"></div></div>
 </div>
-
-<!-- ROW 1 -->
-<div class="row1">
-  <!-- LEFT: Post Feed -->
-  <div class="panel" id="postPanel">
-    <div class="panel-title">Trump Post Feed</div>
-    <div id="postFeed"></div>
-  </div>
-
-  <!-- CENTER: Dotted Heatmap -->
-  <div class="panel" style="overflow:hidden;">
-    <div class="panel-title">Signal Heatmap — Posts × Tickers</div>
-    <div class="heatmap-container" id="heatmapContainer"></div>
-  </div>
-
-  <!-- RIGHT: Active Trades -->
-  <div class="panel">
-    <div class="panel-title">Active Positions</div>
-    <div id="activeTrades"></div>
-  </div>
+<div id=sdd>
+<div id=sddi>
+<span>Daily P&amp;L<b id=d1>—</b></span>
+<span>Open Trades<b id=d2>—</b></span>
+<span>Posts Today<b id=d3>—</b></span>
+<span>Kill Switch<b id=d4>—</b></span>
 </div>
-
-<!-- ROW 2 -->
-<div class="row2">
-  <!-- LEFT: Bot Activity Timeline -->
-  <div class="panel">
-    <div class="panel-title">Bot Activity Timeline (4hr)</div>
-    <div class="chart-container">
-      <canvas id="botChart"></canvas>
-    </div>
-  </div>
-
-  <!-- RIGHT: Signal Playbook -->
-  <div class="panel">
-    <div class="panel-title">Signal Playbook — What To Do Now</div>
-    <div id="playbookPanel"></div>
-  </div>
 </div>
-
-<!-- BOTTOM BAR -->
-<div class="bottom-bar">
-  <div class="bottom-stats">
-    <div>
-      <div class="bottom-stat-label">TODAY P&L</div>
-      <div id="dailyPnl" class="bottom-stat-val">$0.00</div>
-    </div>
-    <div>
-      <div class="bottom-stat-label">WIN RATE</div>
-      <div id="winRate" class="bottom-stat-val">--</div>
-    </div>
-    <div>
-      <div class="bottom-stat-label">TOTAL TRADES</div>
-      <div id="totalTrades" class="bottom-stat-val">0</div>
-    </div>
-    <div>
-      <div class="bottom-stat-label">BEST TRADE</div>
-      <div id="bestTrade" class="bottom-stat-val">--</div>
-    </div>
-  </div>
-  <div class="kill-switch" onclick="toggleKillSwitch()">
-    <span class="kill-label">KILL SWITCH</span>
-    <div id="killToggle" class="kill-switch-toggle">
-      <div class="kill-switch-dot"></div>
-    </div>
-  </div>
 </div>
-
-<!-- TOOLTIP -->
-<div id="heatmapTooltip" class="heatmap-tooltip"></div>
-
-<script>
-// === STATE ===
-let posts = [];
-let activeTrades = [];
-let playbook = {};
-let heatScores = {};
-let marketSnapshot = {};
-let statusData = {};
-let botHistory = []; // synthetic history for chart
-
-const TICKERS = ['SPY','QQQ','GLD','UVIX','COIN','TSLA'];
-
-// === INIT ===
-async function init() {
-  await Promise.all([
-    fetchPosts(), fetchActiveTrades(), fetchPlaybook(),
-    fetchHeat(), fetchMarketSnapshot(), fetchStatus(), fetchPerformance()
-  ]);
-  renderPosts();
-  renderHeatmap();
-  renderActiveTrades();
-  renderPlaybook();
-  initBotChart();
-  startSSE();
-  setInterval(refresh, 8000);
+<div id="t-signal" class="tsec a">
+<div class=cd>
+<div class=ch>Scoreboard</div>
+<div id=sg>
+<div class=sc><div class=sl>P&amp;L</div><div class=sv id=s1>—</div></div>
+<div class=sc><div class=sl>Win Rate</div><div class=sv id=s2>—</div></div>
+<div class=sc><div class=sl>Trades</div><div class=sv id=s3>—</div></div>
+<div class=sc><div class=sl>Best Trade</div><div class=sv id=s4>—</div></div>
+</div>
+</div>
+<div class=cd>
+<div class=ch>Signal Playbook <span id=pbl class=cb>—</span></div>
+<div id=pbw><div class=es>Watching...</div></div>
+</div>
+<div class=cd>
+<div class=ch>Trump Feed <span id=fc class=cb>0</span></div>
+<div id=fl></div>
+</div>
+</div>
+<div id="t-trades" class=tsec>
+<div class=cd>
+<div class=ch>Active Positions <span id=tnc class=cb>0</span></div>
+<div id=tsc class=tsc></div>
+</div>
+</div>
+<div id="t-heat" class=tsec>
+<div class=cd>
+<div class=ch>Bot Activity Heatmap</div>
+<div id=hw><div id=hg class="ld">Loading...</div></div>
+</div>
+</div>
+<div id="t-kill" class=tsec>
+<div class=cd>
+<div class=ch>Emergency Kill Switch</div>
+<div id=kw>
+<div class=kh>Disables all auto-trading immediately.<br>Open positions will NOT be auto-closed.</div>
+<div id=ks>Loading...</div>
+<button id=kt class="off" onclick="toggleKill()">ACTIVATE KILL SWITCH</button>
+</div>
+</div>
+</div>
+</div>
+<nav id=nav>
+<button class="nb a" onclick="sTab('signal')" data-tab="signal"><span class=nb-ic>📡</span><span>Signal</span><span class=nd></span></button><button class=nb onclick="sTab('trades')" data-tab="trades"><span class=nb-ic>📈</span><span>Trades</span><span class=nd></span></button><button class=nb onclick="sTab('heat')" data-tab="heat"><span class=nb-ic>🌡️</span><span>Heat</span><span class=nd></span></button><button class=nb onclick="sTab('kill')" data-tab="kill"><span class=nb-ic>🔴</span><span>Kill</span><span class=nd></span></button>
+</nav>
+<div id=ht></div>
+<div id=tst></div>
+<script>'use strict';
+const $=id=>document.getElementById(id);
+const S={status:null,posts:[],trades:[],heat:{},playbook:{},perf:null};
+const D={s:1,p:1,t:1,h:1,f:1};
+const C={ts:0};
+let curTab='signal',killOn=false,sdOpen=false,rafQ=false,ptr={y:0,on:false};
+const J='application/json',JH={'Content-Type':J};
+function esc(s){const d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML}
+function fmt$(n){const v=parseFloat(n||0);return(v>=0?'+$':'−$')+Math.abs(v).toFixed(2)}
+function fp(n){const v=parseFloat(n||0);return(v>=0?'+':'')+v.toFixed(1)+'%'}
+function ago(iso){if(!iso)return'—';try{return Math.round((Date.now()-new Date(iso))/60000)+'m ago'}catch{return'—'}}
+function hc(s){s=Math.max(0,Math.min(100,s));if(s<25)return`hsl(210,60%,${12+s*.3}%)`;if(s<50)return`hsl(${210-(s-25)*5},60%,${20+s*.2}%)`;if(s<75)return`hsl(${60-(s-50)*2},70%,${25+s*.15}%)`;return`hsl(${10-(s-75)*.2},80%,${30+s*.1}%)`;}
+function ds(s){return Math.round(6+s*.18)+'px'}
+function toast(m,d=2500){const t=$('tst');t.textContent=m;t.classList.add('s');setTimeout(()=>t.classList.remove('s'),d);}
+function mktOpen(){const n=new Date,t=n.getUTCHours()*60+n.getUTCMinutes(),w=n.getUTCDay();return w>0&&w<6&&t>=855&&t<1260;}
+function jx(a,b){return JSON.stringify(a)!==JSON.stringify(b)}
+async function pj(url){return fetch(url).then(r=>r.json());}
+async function poll(){
+if(Date.now()-C.ts<8000)return;
+try{
+let d;
+try{const r=await fetch('/api/mobile-status',{signal:AbortSignal.timeout(7000)});if(r.ok)d=await r.json();}catch{}
+if(!d){
+const [a,b,c,e,f]=await Promise.allSettled([pj('/api/status'),pj('/api/posts'),pj('/api/active_trades'),pj('/api/heat'),pj('/api/performance')]);
+d={status:a.value,posts:b.value||[],trades:c.value||[],heat:e.value||{},perf:f.value};
+if(!Object.keys(S.playbook).length)try{d.playbook=await pj('/api/playbook');}catch{}
 }
-
-async function refresh() {
-  await Promise.all([
-    fetchStatus(), fetchActiveTrades(), fetchHeat(),
-    fetchMarketSnapshot(), fetchPerformance()
-  ]);
-  updateStrikeMeter();
-  renderActiveTrades();
-  updateBotChart();
+C.ts=Date.now();
+if(jx(d.status,S.status)){S.status=d.status;D.s=1;}
+if(jx(d.posts,S.posts)){S.posts=d.posts||[];D.p=1;}
+if(jx(d.trades,S.trades)){S.trades=d.trades||[];D.t=1;}
+if(jx(d.heat,S.heat)){S.heat=d.heat||{};D.h=1;}
+if(jx(d.perf,S.perf)){S.perf=d.perf;D.f=1;}
+if(d.playbook)S.playbook=d.playbook;
+sched();
+}catch(e){console.warn('poll',e);}
 }
-
-// === FETCH ===
-async function fetchPosts() {
-  try { posts = await (await fetch('/api/posts')).json(); } catch(e) { console.error(e); }
+function sched(){if(rafQ)return;rafQ=true;requestAnimationFrame(()=>{rafQ=false;render();});}
+function render(){
+if(D.s){D.s=0;rStrike();rKill();}
+if(D.f){D.f=0;rScore();}
+if(D.p){D.p=0;rFeed();rPB();}
+if(D.t){D.t=0;rTrades();}
+if(D.h&&curTab==='heat'){D.h=0;rHeat();}
 }
-async function fetchActiveTrades() {
-  try { activeTrades = await (await fetch('/api/active_trades')).json(); } catch(e) { console.error(e); }
+const ZL={COLD:'Quiet Zone',WARM:'Elevated',HOT:'Signal Detected',NUCLEAR:'NUCLEAR — IRAN'};
+const ZC={COLD:'zc',WARM:'zw',HOT:'zh',NUCLEAR:'zn'};
+const G='#00e676',R='#ff3d3d';
+function rStrike(){
+const s=S.status;if(!s)return;
+const z=(s.heat_level||'COLD').toUpperCase();
+const [el,ze,le,se,be,d1,d2,d3,d4]=['strike','sz','sl','ss','sb','d1','d2','d3','d4'].map($);
+el.className=ZC[z]||'zc';ze.textContent=z;le.textContent=ZL[z]||z;
+se.textContent=`Last post ${ago(s.last_post_time)} | Iran: ${s.iran_recent?'YES':'No'}`;
+be.style.width=(s.heat_score||0)+'%';
+const pnl=s.daily_pnl||0;
+d1.textContent=fmt$(pnl);d1.style.color=pnl>=0?G:R;
+d2.textContent=s.open_positions||0;d3.textContent=s.trade_count_today||0;
+d4.textContent=s.kill_switch_active?'ACTIVE':'Off';d4.style.color=s.kill_switch_active?R:G;
+killOn=!!s.kill_switch_active;
 }
-async function fetchPlaybook() {
-  try { playbook = await (await fetch('/api/playbook')).json(); } catch(e) { console.error(e); }
+function tSD(){sdOpen=!sdOpen;$('sdd').classList.toggle('o',sdOpen);}
+function rScore(){
+const p=S.perf||{},st=S.status||{},pnl=p.daily_pnl??st.daily_pnl??0;
+const s1=$('s1');s1.textContent=fmt$(pnl);s1.style.color=pnl>=0?G:R;
+$('s2').textContent=fp(p.win_rate??st.win_rate??0);
+$('s3').textContent=p.total_trades??st.trade_count_today??0;
+const bt=p.best_trade;$('s4').textContent=bt?fmt$(bt.pnl):'—';if(bt)$('s4').style.color=G;
 }
-async function fetchHeat() {
-  try { heatScores = await (await fetch('/api/heat')).json(); } catch(e) { console.error(e); }
+function rTrades(){
+const tr=S.trades;$('tnc').textContent=tr.length;
+const w=$('tsc');
+if(!tr.length){w.innerHTML='<div class=es>No active positions —<br>waiting for signal</div>';return;}
+w.innerHTML=tr.map(t=>{
+const lg=(t.direction||'').toUpperCase().includes('LONG')||(t.direction||'')==='BUY';
+const pnl=t.unrealized_pnl??0,pp=t.unrealized_pnl_pct??0;
+return`<div class=tc><div class=th><span class="ttk">${esc(t.actual_ticker||t.signal_ticker||'?')}</span><span class="dp ${lg?'lg':'sh'}">${esc(t.direction||'?')}</span></div><div class="pnl ${pnl>=0?'pp':'pn'}">${fmt$(pnl)} <small style="font-size:12px">(${fp(pp)})</small></div><div class=er>Entry <b>$${esc((t.entry_price||0).toFixed(2))}</b> → Now <b>$${esc((t.current_price||t.entry_price||0).toFixed(2))}</b></div><button class=bc onclick="closeTrade('${esc(t.trade_id||'')}')">CLOSE POSITION</button></div>`;
+}).join('');
 }
-async function fetchMarketSnapshot() {
-  try { marketSnapshot = await (await fetch('/api/market_snapshot')).json(); } catch(e) { console.error(e); }
+function rPB(){
+const posts=S.posts;if(!posts.length)return;
+const cats=posts[posts.length-1].categories||[],pb=S.playbook;
+let key=null,data=null;
+for(const c of cats){if(pb[c]){key=c;data=pb[c];break;}}
+$('pbl').textContent=key||'No match';
+if(!key){$('pbw').innerHTML='<div class=es>No playbook match.</div>';return;}
+const top=data[0],cl=!mktOpen();
+$('pbw').innerHTML=`<div class=pbh><span class=pbt>CURRENT SETUP</span><span class=cb>${esc(key)}</span></div><div class=pba><div class=pbal>TOP SIGNAL</div><div class=pbat>${esc(top.action)} ${esc(top.ticker)} → +${top.avg_return}%</div></div><div class=pm>Confidence: <b>${esc(top.confidence)}</b> | Window: <b>${esc(top.window)}</b><br>Direction: <b>${esc(top.direction)}</b></div><button class="bx"${cl?' disabled':''}onclick="execTrade('${esc(top.ticker)}','${esc(top.action)}','${esc(key)}',this)">${cl?'MARKET CLOSED':'⚡ EXECUTE '+esc(top.action)+' '+esc(top.ticker)}</button>${data.slice(1).map(s=>`<div class=pm style="margin-top:6px;padding-top:6px;border-top:1px solid #1a1a28">Alt: <b>${esc(s.action)} ${esc(s.ticker)}</b> → +${s.avg_return}% (${esc(s.confidence)})<button class="bx" style="margin-top:5px;font-size:12px;padding:8px"${cl?' disabled':''}onclick="execTrade('${esc(s.ticker)}','${esc(s.action)}','${esc(key)}',this)">${esc(s.action)} ${esc(s.ticker)}</button></div>`).join('')}`;
 }
-async function fetchStatus() {
-  try { statusData = await (await fetch('/api/status')).json(); updateStrikeMeter(); } catch(e) { console.error(e); }
+function rFeed(){
+const posts=S.posts.slice(-8).reverse();$('fc').textContent=posts.length;
+if(!posts.length){$('fl').innerHTML='<div class=es>No posts yet.<br>Monitoring...</div>';return;}
+$('fl').innerHTML=posts.map(p=>{
+const cats=p.categories||[],iran=cats.some(c=>c.includes('IRAN')||c.includes('WAR'));
+const cat=cats[0]||'UNCAT';
+const cc=iran?'ci':cat.includes('TARIFF')?'ct':cat.includes('TRADE')?'cd':'';
+return`<div class="pc${iran?' ir':''}" onclick="this.querySelector('.pb').classList.toggle('tr')"><div class=ph><span class=pt>${esc(ago(p.date))}</span><span class="cat ${cc}">${esc(cat)}</span></div><div class="pb tr">${esc((p.text||p.title||'').slice(0,300))}</div></div>`;
+}).join('');
 }
-async function fetchPerformance() {
-  try {
-    const p = await (await fetch('/api/performance')).json();
-    const pnlEl = document.getElementById('dailyPnl');
-    pnlEl.textContent = `$${p.daily_pnl >= 0 ? '+' : ''}${p.daily_pnl.toFixed(2)}`;
-    pnlEl.className = 'bottom-stat-val ' + (p.daily_pnl >= 0 ? 'positive' : 'negative');
-    document.getElementById('winRate').textContent = `${p.win_rate}%`;
-    document.getElementById('totalTrades').textContent = p.total_trades;
-    if (p.best_trade) {
-      document.getElementById('bestTrade').textContent = `${p.best_trade.ticker} +$${p.best_trade.pnl.toFixed(0)}`;
-      document.getElementById('bestTrade').className = 'bottom-stat-val positive';
-    }
-  } catch(e) { console.error(e); }
+const TKS=['SPY','QQQ','GLD','UVIX','COIN','TSLA'];
+function rHeat(){
+const h=S.heat,now=Date.now(),bits=[];
+for(let r=0;r<6;r++){
+const tk=TKS[r],base=h[tk]||50;
+for(let c=0;c<8;c++){
+const i=r*8+c,sc=Math.round(Math.max(0,Math.min(100,base+Math.sin(i*1.7+now/5000)*15+Math.cos(i*2.3)*10))),sz=ds(sc);
+bits.push(`<div class=hd style="width:${sz};height:${sz};background:${hc(sc)};margin:auto" onclick="showHT(event,'${tk}',${sc})"></div>`);
 }
-
-// === STRIKE METER ===
-function updateStrikeMeter() {
-  const el = document.getElementById('strikeText');
-  const needle = document.getElementById('gaugeNeedle');
-  const level = statusData.heat_level || 'COLD';
-  const score = statusData.heat_score || 15;
-  const mins = statusData.minutes_since_post;
-
-  el.className = 'strike-status-text ' + level.toLowerCase();
-
-  if (level === 'NUCLEAR') {
-    el.innerHTML = '☢️ NUCLEAR — STRIKE NOW';
-    needle.style.left = '95%';
-  } else if (level === 'HOT') {
-    el.innerHTML = '🔥 HOT — Signal Active';
-    needle.style.left = '72%';
-  } else if (level === 'WARM') {
-    el.innerHTML = '🌡️ WARM — Post Detected';
-    needle.style.left = '45%';
-  } else {
-    el.innerHTML = '🥶 COLD — Bots Inactive';
-    needle.style.left = '10%';
-  }
-
-  if (mins < 999) {
-    const h = Math.floor(mins/60);
-    const m = Math.floor(mins%60);
-    document.getElementById('lastPostAgo').textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
-  }
-  document.getElementById('openTradeCount').textContent = statusData.open_positions || 0;
-  document.getElementById('heatPercent').textContent = `${score}/100`;
+bits.push(`<div class=htk style="grid-column:span 8">${tk}</div>`);
 }
-
-// === POSTS ===
-function renderPosts() {
-  const feed = document.getElementById('postFeed');
-  const sorted = [...posts].reverse().slice(0, 15);
-  feed.innerHTML = sorted.map(p => {
-    const cats = p.categories || [];
-    const isIran = cats.some(c => c.includes('IRAN') || c.includes('WAR'));
-    const badges = cats.map(c => `<span class="badge badge-${c}">${c}</span>`).join('');
-    const iranBadge = isIran ? '<span class="badge iran-badge">☢️</span>' : '';
-    const d = p.date ? new Date(p.date).toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-    return `
-      <div class="post-card ${isIran ? 'iran-post' : ''}">
-        <div class="post-time">${d} • ${p.source || ''}</div>
-        <div class="post-text">${escHtml(p.text || '')}</div>
-        <div class="post-badges">${iranBadge}${badges}</div>
-      </div>`;
-  }).join('');
+const g=$('hg');g.className='';g.style.gridTemplateColumns='repeat(8,1fr)';g.innerHTML=bits.join('');
 }
-
-// === HEATMAP ===
-function renderHeatmap() {
-  const container = document.getElementById('heatmapContainer');
-  const recentPosts = [...posts].reverse().slice(0, 16);
-  const nPosts = recentPosts.length || 1;
-
-  // Build grid: tickers as rows, posts as columns, plus label column
-  const cols = nPosts + 1;
-  const rows = TICKERS.length;
-  container.style.display = 'grid';
-  container.style.gridTemplateColumns = `50px repeat(${nPosts}, 1fr)`;
-  container.style.gridTemplateRows = `repeat(${rows}, 1fr) 30px`;
-  container.innerHTML = '';
-
-  const tooltip = document.getElementById('heatmapTooltip');
-
-  TICKERS.forEach((ticker, ri) => {
-    // Y-axis label
-    const lbl = document.createElement('div');
-    lbl.className = 'heatmap-ylabel';
-    lbl.textContent = ticker;
-    container.appendChild(lbl);
-
-    recentPosts.forEach((post, ci) => {
-      const cell = document.createElement('div');
-      cell.className = 'heatmap-cell';
-
-      const cats = post.categories || [];
-      let signal = findSignalForTickerAndCats(ticker, cats);
-
-      const dot = document.createElement('div');
-      dot.className = 'heatmap-dot';
-
-      if (signal) {
-        const strength = Math.abs(signal.avg_return);
-        const size = Math.max(8, Math.min(36, strength * 10));
-        dot.style.width = size + 'px';
-        dot.style.height = size + 'px';
-        dot.classList.add(signal.direction === 'BULLISH' ? 'bullish' : 'bearish');
-        if (ci < 3) dot.classList.add('active'); // recent = pulsing
-
-        dot.addEventListener('mouseenter', (e) => {
-          tooltip.style.display = 'block';
-          tooltip.innerHTML = `<strong>${ticker}</strong> — ${signal.direction}<br>` +
-            `Signal: ${cats.join(', ')}<br>` +
-            `Avg return: ${signal.avg_return > 0 ? '+' : ''}${signal.avg_return}%<br>` +
-            `Window: ${signal.window}`;
-        });
-        dot.addEventListener('mousemove', (e) => {
-          tooltip.style.left = (e.clientX + 12) + 'px';
-          tooltip.style.top = (e.clientY - 10) + 'px';
-        });
-        dot.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
-      } else {
-        dot.style.width = '6px';
-        dot.style.height = '6px';
-        dot.classList.add('neutral');
-      }
-
-      cell.appendChild(dot);
-      container.appendChild(cell);
-    });
-  });
-
-  // Bottom row: x-axis labels
-  const spacer = document.createElement('div');
-  container.appendChild(spacer);
-  recentPosts.forEach(p => {
-    const xl = document.createElement('div');
-    xl.className = 'heatmap-xlabel';
-    const d = p.date ? new Date(p.date) : null;
-    xl.textContent = d ? `${d.getMonth()+1}/${d.getDate()}` : '?';
-    container.appendChild(xl);
-  });
+function showHT(e,tk,sc){
+const t=$('ht'),r=e.target.getBoundingClientRect();
+t.innerHTML=`<b>${esc(tk)}</b>Activity: ${sc}/100<br><small>${sc>75?'Very High':sc>50?'Elevated':sc>25?'Normal':'Low'}</small>`;
+t.style.cssText=`display:block;left:${Math.min(r.left,innerWidth-190)}px;top:${r.top-70}px`;
+setTimeout(()=>t.style.display='none',2000);
 }
-
-function findSignalForTickerAndCats(ticker, cats) {
-  for (const cat of cats) {
-    const signals = playbook[cat];
-    if (!signals) continue;
-    for (const s of signals) {
-      if (s.ticker === ticker) return s;
-    }
-  }
-  return null;
+function rKill(){
+const b=$('kt'),s=$('ks');
+b.className=killOn?'on':'off';b.textContent=killOn?'DEACTIVATE KILL SWITCH':'ACTIVATE KILL SWITCH';
+s.className=killOn?'on':'';s.textContent=killOn?'ACTIVE — Trading Disabled':'Trading Active';
 }
-
-// === ACTIVE TRADES ===
-function renderActiveTrades() {
-  const el = document.getElementById('activeTrades');
-  if (!activeTrades.length) {
-    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:11px;padding:20px;">No open positions</div>';
-    return;
-  }
-  el.innerHTML = activeTrades.map(t => {
-    const isLong = !t.direction || !t.direction.includes('SHORT');
-    const pnl = t.unrealized_pnl || 0;
-    const pnlPct = t.unrealized_pnl_pct || 0;
-    const pnlClass = pnl >= 0 ? 'positive' : 'negative';
-    const dirClass = isLong ? 'long' : 'short';
-    const exitBy = t.exit_by ? new Date(t.exit_by).toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '--';
-    const targetPct = t.target_pct || 1;
-    const progress = Math.min(100, Math.max(0, (pnlPct / targetPct) * 100));
-    const fillColor = pnl >= 0 ? 'var(--profit)' : 'var(--loss)';
-
-    return `
-      <div class="trade-card">
-        <div class="trade-header">
-          <span class="trade-ticker ${dirClass}">${t.actual_ticker || t.signal_ticker || '?'}</span>
-          <span class="trade-direction ${dirClass}">${isLong ? 'LONG' : 'SHORT'}</span>
-        </div>
-        <div class="trade-pnl ${pnlClass}">$${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%)</div>
-        <div class="trade-meta">${t.shares || 0} shares @ $${(t.entry_price || 0).toFixed(2)} • Exit: ${exitBy}</div>
-        <div class="trade-price-bar">
-          <div class="trade-price-fill" style="width:${Math.abs(progress)}%;background:${fillColor}"></div>
-        </div>
-      </div>`;
-  }).join('');
+async function toggleKill(){
+try{const r=await fetch('/api/killswitch',{method:'POST'}),d=await r.json();killOn=d.kill_switch_active;toast(d.message||'Toggled');rKill();C.ts=0;poll();}
+catch(e){toast('Error: '+e.message);}
 }
-
-// === PLAYBOOK ===
-function renderPlaybook() {
-  const el = document.getElementById('playbookPanel');
-
-  // Find current setup from most recent post
-  const lastPost = posts.length ? posts[posts.length - 1] : null;
-  const cats = lastPost ? (lastPost.categories || []) : [];
-  let activeCat = null;
-  let activeSignals = [];
-
-  for (const c of cats) {
-    if (playbook[c]) {
-      activeCat = c;
-      activeSignals = playbook[c];
-      break;
-    }
-  }
-
-  if (!activeCat) {
-    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-family:var(--mono);font-size:11px;">Waiting for signal...</div>';
-    return;
-  }
-
-  const cards = activeSignals.map(sig => {
-    const isShort = sig.action === 'SHORT';
-    const actualTicker = isShort && ({'QQQ':'SQQQ','SPY':'SPXU'}[sig.ticker])
-      ? {'QQQ':'SQQQ','SPY':'SPXU'}[sig.ticker] : sig.ticker;
-    const price = marketSnapshot[sig.ticker] ? marketSnapshot[sig.ticker].price : '---';
-    const btnClass = isShort ? 'execute-btn short-btn' : 'execute-btn';
-
-    return `
-      <div class="playbook-card">
-        <div class="playbook-setup">SETUP: ${activeCat} → ${sig.ticker} ${sig.direction}</div>
-        <div class="playbook-step">
-          <div class="playbook-step-num">1</div>
-          <div>ENTER: <strong>${isShort ? 'BUY ' + actualTicker + ' (inverse)' : 'BUY ' + sig.ticker}</strong> @ $${price}</div>
-        </div>
-        <div class="playbook-step">
-          <div class="playbook-step-num">2</div>
-          <div>TARGET: <strong>${sig.avg_return > 0 ? '+' : ''}${sig.avg_return}%</strong> in ${sig.window}</div>
-        </div>
-        <div class="playbook-step">
-          <div class="playbook-step-num">3</div>
-          <div>STOP: <strong>-0.5%</strong></div>
-        </div>
-        <div class="playbook-winrate">Confidence: ${sig.confidence} | Historical avg: ${sig.avg_return > 0 ? '+' : ''}${sig.avg_return}%</div>
-        <button class="${btnClass}" onclick="executeTrade('${sig.ticker}','${sig.action}','${activeCat}')">
-          EXECUTE ${sig.action} ${sig.ticker}
-        </button>
-      </div>`;
-  });
-
-  el.innerHTML = cards.join('');
+async function execTrade(ticker,dir,sig,btn){
+if(navigator.vibrate)navigator.vibrate([50,30,100]);
+btn.disabled=true;btn.textContent='Executing...';
+try{
+const r=await fetch('/api/execute_trade',{method:'POST',headers:JH,body:JSON.stringify({ticker,direction:dir,signal:sig})}),d=await r.json();
+if(r.ok){toast(`Executed: ${dir} ${ticker}`);if(navigator.vibrate)navigator.vibrate(200);C.ts=0;poll();}
+else{toast('Error: '+(d.error||'Failed'),4000);btn.disabled=false;btn.textContent=dir+' '+ticker;}
+}catch(e){toast('Network error',3000);btn.disabled=false;btn.textContent=dir+' '+ticker;}
 }
-
-// === BOT CHART ===
-let botChart = null;
-function initBotChart() {
-  // Generate synthetic 4hr history
-  const now = Date.now();
-  for (let i = 48; i >= 0; i--) {
-    const t = now - i * 5 * 60000;
-    botHistory.push({ t, score: 25 + Math.random() * 30 });
-  }
-
-  const ctx = document.getElementById('botChart').getContext('2d');
-  botChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: botHistory.map(h => new Date(h.t).toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'})),
-      datasets: [{
-        label: 'Bot Heat Score',
-        data: botHistory.map(h => h.score),
-        borderColor: '#ff6600',
-        backgroundColor: function(context) {
-          const chart = context.chart;
-          const {ctx: c, chartArea} = chart;
-          if (!chartArea) return '#ff660033';
-          const gradient = c.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-          gradient.addColorStop(0, 'rgba(13,33,55,0.3)');
-          gradient.addColorStop(0.5, 'rgba(255,136,0,0.15)');
-          gradient.addColorStop(1, 'rgba(255,42,42,0.3)');
-          return gradient;
-        },
-        fill: true,
-        tension: 0.3,
-        pointRadius: 0,
-        borderWidth: 2,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        annotation: {},
-      },
-      scales: {
-        x: {
-          grid: { color: 'rgba(30,30,54,0.5)' },
-          ticks: { color: '#555577', font: { size: 9, family: 'Courier New' }, maxTicksLimit: 12 },
-        },
-        y: {
-          min: 0, max: 100,
-          grid: { color: 'rgba(30,30,54,0.5)' },
-          ticks: { color: '#555577', font: { size: 9, family: 'Courier New' } },
-        }
-      },
-      interaction: { intersect: false, mode: 'index' },
-    }
-  });
+async function closeTrade(id){
+if(!id){toast('No trade ID');return;}
+const btn=event.currentTarget;btn.disabled=true;btn.textContent='Closing...';
+try{
+const r=await fetch('/api/close_position',{method:'POST',headers:JH,body:JSON.stringify({trade_id:id})});
+if(r.ok){toast('Position closed');C.ts=0;poll();}
+else{toast('Error',3000);btn.disabled=false;btn.textContent='CLOSE POSITION';}
+}catch(e){toast('Network error',3000);btn.disabled=false;btn.textContent='CLOSE POSITION';}
 }
-
-function updateBotChart() {
-  if (!botChart) return;
-  // Add new data point
-  const avgHeat = Object.values(heatScores).reduce((a,b) => a+b, 0) / Math.max(1, Object.keys(heatScores).length);
-  botHistory.push({ t: Date.now(), score: avgHeat || (25 + Math.random() * 30) });
-  if (botHistory.length > 60) botHistory.shift();
-
-  botChart.data.labels = botHistory.map(h => new Date(h.t).toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}));
-  botChart.data.datasets[0].data = botHistory.map(h => h.score);
-  botChart.update('none');
+function sTab(tab){
+curTab=tab;
+['signal','trades','heat','kill'].forEach(k=>{const el=$('t-'+k);if(el)el.classList.toggle('a',k===tab);});
+document.querySelectorAll('.nb').forEach(b=>b.classList.toggle('a',b.dataset.tab===tab));
+if(tab==='heat'&&D.h){D.h=0;rHeat();}
+$('app').scrollTo({top:0,behavior:'smooth'});
 }
-
-// === ACTIONS ===
-async function executeTrade(ticker, direction, signal) {
-  if (!confirm(`Execute ${direction} ${ticker} ($2,500 paper)?`)) return;
-  try {
-    const resp = await fetch('/api/execute_trade', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ ticker, direction, signal }),
-    });
-    const data = await resp.json();
-    if (data.error) {
-      alert('Error: ' + data.error);
-    } else {
-      alert(`Trade ${data.status}: ${direction} ${ticker}`);
-      fetchActiveTrades().then(renderActiveTrades);
-    }
-  } catch(e) { alert('Trade failed: ' + e.message); }
-}
-
-async function toggleKillSwitch() {
-  try {
-    const resp = await fetch('/api/killswitch', { method: 'POST' });
-    const data = await resp.json();
-    const toggle = document.getElementById('killToggle');
-    if (data.kill_switch_active) {
-      toggle.classList.add('active');
-    } else {
-      toggle.classList.remove('active');
-    }
-  } catch(e) { console.error(e); }
-}
-
-// === SSE ===
-function startSSE() {
-  const es = new EventSource('/api/stream');
-  es.addEventListener('status_update', (e) => {
-    try {
-      statusData = JSON.parse(e.data);
-      updateStrikeMeter();
-    } catch(err) {}
-  });
-  es.addEventListener('new_post', (e) => {
-    try {
-      const p = JSON.parse(e.data);
-      posts.push(p);
-      renderPosts();
-      renderHeatmap();
-      renderPlaybook();
-    } catch(err) {}
-  });
-  es.addEventListener('new_trade', (e) => {
-    try {
-      fetchActiveTrades().then(renderActiveTrades);
-      fetchPerformance();
-    } catch(err) {}
-  });
-  es.onerror = () => { setTimeout(startSSE, 5000); es.close(); };
-}
-
-// === UTIL ===
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// Boot
-init();
-</script>
+const ap=$('app');
+ap.addEventListener('touchstart',e=>{if(ap.scrollTop===0)ptr={y:e.touches[0].clientY,on:true};},{passive:true});
+ap.addEventListener('touchmove',e=>{if(ptr.on&&e.touches[0].clientY-ptr.y>50)$('ptr').classList.add('s');},{passive:true});
+ap.addEventListener('touchend',()=>{if(ptr.on&&ap.scrollTop===0){C.ts=0;poll();}ptr.on=false;$('ptr').classList.remove('s');},{passive:true});
+poll();setInterval(poll,10000);</script>
 </body>
 </html>

@@ -20,6 +20,9 @@ from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI(title="TrumpQuant Dashboard v2")
 
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 HTML_FILE = BASE_DIR / "dashboard.html"
@@ -147,7 +150,10 @@ def _get_alpaca_price(ticker):
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
     if HTML_FILE.exists():
-        return HTMLResponse(content=HTML_FILE.read_text())
+        return HTMLResponse(
+            content=HTML_FILE.read_text(),
+            headers={"Cache-Control": "public, max-age=300"}
+        )
     return HTMLResponse(content="<h1>dashboard.html not found</h1>", status_code=404)
 
 
@@ -358,6 +364,107 @@ async def get_performance():
         "total_trades": len(trades),
         "best_trade": best_trade,
     }
+
+
+@app.get("/api/mobile-status")
+async def mobile_status():
+    """Single endpoint for mobile — returns everything in one call."""
+    status = await get_status()
+    posts = _load_posts()
+    trades = _load_trades()
+
+    # Active trades with prices
+    active = [t for t in trades if t.get("status") in ("OPEN", "LOGGED")]
+    for t in active:
+        ticker = t.get("actual_ticker") or t.get("signal_ticker")
+        if ticker:
+            price = _get_alpaca_price(ticker)
+            if price:
+                entry = t.get("entry_price", 0)
+                t["current_price"] = price
+                if entry > 0:
+                    if "SHORT" in t.get("direction", ""):
+                        t["unrealized_pnl"] = round((entry - price) * t.get("shares", 1), 2)
+                        t["unrealized_pnl_pct"] = round((entry - price) / entry * 100, 2)
+                    else:
+                        t["unrealized_pnl"] = round((price - entry) * t.get("shares", 1), 2)
+                        t["unrealized_pnl_pct"] = round((price - entry) / entry * 100, 2)
+
+    # Heat
+    heat = await get_heat()
+
+    # Last signal
+    last_signal = None
+    if posts:
+        last_post = posts[-1]
+        cats = last_post.get("categories", [])
+        for c in cats:
+            if c in TOP_SIGNALS:
+                last_signal = {"category": c, "signals": TOP_SIGNALS[c]}
+                break
+
+    # Performance
+    perf = await get_performance()
+
+    return {
+        **status,
+        "posts": posts[-8:],
+        "active_trades": active,
+        "heat": heat,
+        "last_signal": last_signal,
+        "performance": perf,
+        "playbook": TOP_SIGNALS,
+    }
+
+
+@app.post("/api/close_position")
+async def close_position(req: dict):
+    """Close a position by trade_id."""
+    trade_id = req.get("trade_id")
+    if not trade_id:
+        return JSONResponse(status_code=400, content={"error": "trade_id required"})
+
+    trades = _load_trades()
+    for t in trades:
+        if t.get("trade_id") == trade_id and t.get("status") in ("OPEN", "LOGGED"):
+            # Try to close via Alpaca if it has an order
+            actual_ticker = t.get("actual_ticker") or t.get("signal_ticker")
+            if actual_ticker and t.get("status") == "OPEN":
+                try:
+                    close_side = "sell" if t.get("side") == "buy" else "buy"
+                    url = f"{ALPACA_URL}/v2/orders"
+                    payload = {
+                        "symbol": actual_ticker,
+                        "qty": str(t.get("shares", 1)),
+                        "side": close_side,
+                        "type": "market",
+                        "time_in_force": "day",
+                    }
+                    requests.post(url, json=payload, headers=alpaca_headers(), timeout=15)
+                except Exception:
+                    pass
+
+            # Get exit price
+            exit_price = _get_alpaca_price(actual_ticker) if actual_ticker else None
+            entry = t.get("entry_price", 0)
+            if exit_price and entry > 0:
+                if "SHORT" in t.get("direction", ""):
+                    t["realized_pnl"] = round((entry - exit_price) * t.get("shares", 1), 2)
+                else:
+                    t["realized_pnl"] = round((exit_price - entry) * t.get("shares", 1), 2)
+                t["exit_price"] = exit_price
+
+            t["status"] = "CLOSED"
+            t["closed_at"] = datetime.now(timezone.utc).isoformat()
+            t["close_source"] = "dashboard_mobile"
+
+            trades_file = DATA_DIR / "bot_trades.json"
+            with open(trades_file, "w") as f:
+                json.dump(trades, f, indent=2)
+
+            return {"status": "closed", "trade": t}
+
+    return JSONResponse(status_code=404, content={"error": "Trade not found or already closed"})
 
 
 class TradeRequest(BaseModel):
