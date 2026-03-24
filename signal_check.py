@@ -51,6 +51,15 @@ INVERSE_MAP = {
 
 POSITION_SIZE = 2500  # max dollars per trade
 
+# Fallback routing when primary ticker is already held
+FALLBACK_MAP = {
+    "UVIX": "SQQQ",
+    "SQQQ": "SPXU",
+    "SPXU": None,   # no further fallback
+    "GLD": None,
+}
+MAX_CONCURRENT_POSITIONS = 2  # max 2 concurrent positions across all tickers
+
 # Calibrated signals from 35k-post correlation data
 TOP_SIGNALS = {
     # Iran war signals — highest volatility, biggest moves
@@ -303,26 +312,34 @@ def execute_paper_trade(signal, post, category):
         print(f"  Skipping — already traded {actual_ticker} for post {post['id']} today")
         return None
 
-    # GUARD 2: Check for existing position (no pyramiding)
-    existing_pos = get_position_for_ticker(actual_ticker)
-    if existing_pos:
-        print(f"  Skipping — already holding {actual_ticker} ({existing_pos.get('qty', '?')} shares)")
+    # GUARD 2+4: Fetch all positions once — per-ticker dedup + concurrent position limit
+    try:
+        positions_resp = requests.get(f"{ALPACA_URL}/v2/positions", headers=alpaca_headers(), timeout=8)
+        all_positions = positions_resp.json() if positions_resp.status_code == 200 else []
+    except Exception:
+        all_positions = []
+    held_tickers = {p["symbol"] for p in all_positions} if isinstance(all_positions, list) else set()
+
+    if actual_ticker in held_tickers:
+        # Try fallback routing
+        fallback = FALLBACK_MAP.get(actual_ticker)
+        if fallback and fallback not in held_tickers:
+            print(f"  Routing to fallback: {fallback} ({actual_ticker} already held)")
+            actual_ticker = fallback
+            side = "buy"
+            trade_direction = f"LONG (fallback from {ticker})"
+        else:
+            print(f"  Skipping — already holding {actual_ticker}, no fallback available")
+            return None
+
+    if len(held_tickers) >= MAX_CONCURRENT_POSITIONS:
+        print(f"  Skipping — max {MAX_CONCURRENT_POSITIONS} concurrent positions ({len(held_tickers)}/{MAX_CONCURRENT_POSITIONS} held)")
         return None
 
     # GUARD 3: Check total portfolio exposure
-    total_exposure = get_total_exposure()
+    total_exposure = sum(abs(float(p.get("market_value", 0))) for p in all_positions) if all_positions else 0
     if total_exposure >= MAX_DAILY_EXPOSURE:
         print(f"  Skipping — total exposure ${total_exposure:.0f} >= ${MAX_DAILY_EXPOSURE} cap")
-        return None
-
-    # GUARD 4: Check number of open positions
-    try:
-        resp = requests.get(f"{ALPACA_URL}/v2/positions", headers=alpaca_headers(), timeout=8)
-        num_positions = len(resp.json()) if resp.status_code == 200 else 0
-    except Exception:
-        num_positions = 0
-    if num_positions >= MAX_POSITIONS:
-        print(f"  Skipping — already have {num_positions} positions (max {MAX_POSITIONS})")
         return None
 
     # HARD CAP position size: $2,500 regardless of multipliers
@@ -770,6 +787,7 @@ def main():
     save_seen(seen)
     print(f"Done. Checked {len(posts)} posts, fired {fired} alerts, "
           f"trades this run: {trades_this_run}, seen pool: {len(seen)}")
+    print("ADD MONITOR CRON: */5 9-16 * * 1-5 America/Los_Angeles — python3 signal_check.py monitor")
 
 
 def close_eod_positions():
