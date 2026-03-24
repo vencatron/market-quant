@@ -12,13 +12,16 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import aiohttp
 import requests
 from fastapi import FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI(title="TrumpQuant Dashboard v2")
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -156,18 +159,39 @@ def alpaca_headers():
     }
 
 
-def _get_alpaca_price(ticker):
+async def _get_alpaca_price_async(session: aiohttp.ClientSession, ticker: str) -> float | None:
+    """Async price fetch — non-blocking."""
     try:
         url = f"https://data.alpaca.markets/v2/stocks/{ticker}/quotes/latest"
-        resp = requests.get(url, headers=alpaca_headers(), timeout=8)
-        if resp.status_code == 200:
-            q = resp.json().get("quote", {})
-            mid = (q.get("ap", 0) + q.get("bp", 0)) / 2
-            if mid > 0:
-                return round(mid, 2)
+        async with session.get(url, headers=alpaca_headers(), timeout=aiohttp.ClientTimeout(total=5)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                q = data.get("quote", {})
+                mid = (q.get("ap", 0) + q.get("bp", 0)) / 2
+                if mid > 0:
+                    return round(mid, 2)
     except Exception:
         pass
     return None
+
+
+async def _fetch_all_prices() -> dict:
+    """Fetch all ticker prices concurrently — all 6 tickers in parallel."""
+    mock_prices = {"SPY": 585.20, "QQQ": 510.80, "GLD": 292.80,
+                   "UVIX": 28.50, "COIN": 265.40, "TSLA": 342.60}
+    try:
+        async with aiohttp.ClientSession() as session:
+            tasks = {t: _get_alpaca_price_async(session, t) for t in WATCHLIST}
+            results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+            prices = {}
+            for ticker, result in zip(tasks.keys(), results):
+                if isinstance(result, float):
+                    prices[ticker] = result
+                else:
+                    prices[ticker] = mock_prices.get(ticker, 100.0)
+            return prices
+    except Exception:
+        return mock_prices
 
 
 # --- API Endpoints ---
@@ -336,17 +360,11 @@ async def get_market_snapshot():
     if now - _market_cache_time < MARKET_CACHE_TTL and _market_cache:
         return _market_cache
 
+    prices = await _fetch_all_prices()
     data = {}
-    for ticker in WATCHLIST:
-        price = _get_alpaca_price(ticker)
-        if price:
-            data[ticker] = {"price": price, "change_pct": round(random.uniform(-2, 2), 2)}
-        else:
-            # Fallback mock
-            mock_prices = {"SPY": 585.20, "QQQ": 510.80, "GLD": 292.80, "UVIX": 28.50, "COIN": 265.40, "TSLA": 342.60}
-            p = mock_prices.get(ticker, 100.0)
-            change = round(random.uniform(-2.5, 2.5), 2)
-            data[ticker] = {"price": round(p + p * change / 100, 2), "change_pct": change}
+    for ticker, price in prices.items():
+        change = round(random.uniform(-2.5, 2.5), 2)
+        data[ticker] = {"price": price, "change_pct": change}
 
     _market_cache = data
     _market_cache_time = now
