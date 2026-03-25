@@ -147,6 +147,14 @@ def open_swing_position(ticker, direction, signal_category, thesis, target_pct, 
     with open(SWING_LOG_FILE, "a") as f:
         f.write(json.dumps({**position, "event": "OPEN"}) + "\n")
 
+    # Auto-sell covered call against new long position
+    if direction == "BUY":
+        try:
+            from options_engine import integrate_with_swing
+            integrate_with_swing()
+        except Exception as e:
+            logger.info(f"Covered call check skipped: {e}")
+
     return position
 
 def monitor_swing_positions():
